@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GlmCoder - Java Coding Agent</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --fg: #c9d1d9;
+            --border: #30363d;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --danger: #f85149;
+            --success: #3fb950;
+            --panel-bg: #161b22;
+            --input-bg: #0d1117;
+            --code-bg: #1a1f2b;
+            --header-bg: #161b22;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+        header h1 { font-size: 18px; font-weight: 600; color: var(--accent); }
+        .project-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .project-bar input {
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            width: 260px;
+        }
+        .project-bar input::placeholder { color: #484f58; }
+        button {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        button:hover { background: var(--accent-hover); }
+        button.danger { background: var(--danger); }
+        button.danger:hover { background: #da3633; }
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 280px;
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 13px;
+            color: #8b949e;
+            text-transform: uppercase;
+        }
+        .code-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            background: var(--code-bg);
+        }
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .message {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .message.user {
+            align-self: flex-end;
+            background: var(--accent);
+            color: #fff;
+        }
+        .message.agent {
+            align-self: flex-start;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+        }
+        .message.agent pre {
+            background: var(--code-bg);
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 6px 0;
+        }
+        .message.system {
+            align-self: center;
+            background: transparent;
+            color: #8b949e;
+            font-size: 12px;
+        }
+        .chat-input-area {
+            border-top: 1px solid var(--border);
+            padding: 12px 16px;
+            display: flex;
+            gap: 8px;
+        }
+        .chat-input-area textarea {
+            flex: 1;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 10px;
+            border-radius: 8px;
+            resize: none;
+            font-size: 14px;
+            font-family: inherit;
+            min-height: 44px;
+            max-height: 120px;
+        }
+        .chat-input-area textarea::placeholder { color: #484f58; }
+        .status-bar {
+            padding: 6px 16px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: #8b949e;
+            display: flex;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+        .status-bar .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .dot.connected { background: var(--success); }
+        .dot.disconnected { background: var(--danger); }
+        .stats { margin-left: auto; color: #58a6ff; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>GlmCoder</h1>
+        <span style="color:#8b949e;font-size:13px;">GLM-4.7-Flash</span>
+        <div class="project-bar">
+            <input type="text" id="projectPath" placeholder="项目路径，如 /workspace/GlmCoder" value="/workspace/GlmCoder">
+            <button id="openProjectBtn" onclick="openProject()">打开项目</button>
+            <button id="indexBtn" onclick="indexProject()" class="danger" style="display:none;">索引</button>
+        </div>
+    </header>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-header">代码结构</div>
+            <div class="code-panel" id="codePanel">
+                <span style="color:#8b949e;">打开项目后自动显示代码结构</span>
+            </div>
+        </div>
+        <div class="chat-area">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message system">打开项目开始编码对话</div>
+            </div>
+            <div class="chat-input-area">
+                <textarea id="chatInput" placeholder="输入编码任务，如「重构 UserService 中的重复代码」" rows="1"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+                <button id="sendBtn" onclick="sendMessage()" disabled>发送</button>
+            </div>
+            <div class="status-bar">
+                <span><span class="dot disconnected" id="statusDot"></span> <span id="statusText">未连接</span></span>
+                <span class="stats" id="statsText"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let projectId = null;
+
+        function updateStatus(connected, text) {
+            const dot = document.getElementById('statusDot');
+            dot.className = 'dot ' + (connected ? 'connected' : 'disconnected');
+            document.getElementById('statusText').textContent = text;
+        }
+
+        async function openProject() {
+            const path = document.getElementById('projectPath').value.trim();
+            if (!path) return;
+            addMessage('system', '正在打开项目: ' + path + '...');
+            try {
+                const res = await fetch('/ui/project/open', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'path=' + encodeURIComponent(path)
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    projectId = data.projectId;
+                    updateStatus(true, '项目已打开');
+                    document.getElementById('sendBtn').disabled = false;
+                    document.getElementById('indexBtn').style.display = 'inline-block';
+                    document.getElementById('statsText').textContent = 'ID: ' + projectId;
+                    loadStructure();
+                } else {
+                    addMessage('system', '错误: ' + data.message);
+                }
+            } catch (e) {
+                addMessage('system', '连接失败: ' + e.message);
+            }
+        }
+
+        async function indexProject() {
+            if (!projectId) return;
+            addMessage('system', '正在索引项目代码...');
+            try {
+                const res = await fetch('/api/index?projectId=' + projectId, { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    addMessage('system', '索引完成: ' + data.classes + ' 个类, ' + data.methods + ' 个方法');
+                    document.getElementById('statsText').textContent = data.classes + ' classes | ' + data.methods + ' methods';
+                    loadStructure();
+                }
+            } catch (e) {
+                addMessage('system', '索引失败: ' + e.message);
+            }
+        }
+
+        async function loadStructure() {
+            if (!projectId) return;
+            try {
+                const res = await fetch('/api/structure?projectId=' + projectId);
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    document.getElementById('codePanel').textContent = data.summary;
+                }
+            } catch (e) {
+                document.getElementById('codePanel').textContent = '加载结构失败';
+            }
+        }
+
+        function addMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = 'message ' + role;
+            div.textContent = text;
+            document.getElementById('chatMessages').appendChild(div);
+            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message || !projectId) return;
+
+            addMessage('user', message);
+            input.value = '';
+            addMessage('system', '处理中...');
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append('projectId', projectId);
+                formData.append('message', message);
+
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData.toString()
+                });
+                const data = await res.json();
+
+                const sysMsg = document.querySelector('.message.system:last-child');
+                if (sysMsg && sysMsg.textContent === '处理中...') sysMsg.remove();
+
+                if (data.status === 'ok') {
+                    addMessage('agent', data.response);
+                } else {
+                    addMessage('system', '错误: ' + data.message);
+                }
+            } catch (e) {
+                addMessage('system', '请求失败: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
