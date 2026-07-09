@@ -1,7 +1,7 @@
 package com.example.glmcoder.index;
 
+import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParserConfiguration;
-import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
@@ -21,16 +21,18 @@ import java.util.stream.Collectors;
 @Component
 public class CodeStructureIndex {
 
-    static {
-        ParserConfiguration config = new ParserConfiguration();
-        config.setLanguageLevel(ParserConfiguration.LanguageLevel.JAVA_17);
-        StaticJavaParser.setConfiguration(config);
-    }
+    private final JavaParser javaParser;
 
     private final ConcurrentHashMap<String, ClassInfo> classIndex = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, MethodInfo> methodIndex = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, List<String>> fileImports = new ConcurrentHashMap<>();
     private final CallGraphBuilder callGraph = new CallGraphBuilder();
+
+    public CodeStructureIndex() {
+        ParserConfiguration config = new ParserConfiguration();
+        config.setLanguageLevel(ParserConfiguration.LanguageLevel.JAVA_17);
+        this.javaParser = new JavaParser(config);
+    }
 
     public void buildIndex(List<Path> javaFiles) {
         classIndex.clear();
@@ -41,7 +43,8 @@ public class CodeStructureIndex {
         for (Path file : javaFiles) {
             try {
                 String content = Files.readString(file);
-                CompilationUnit cu = StaticJavaParser.parse(content);
+                CompilationUnit cu = javaParser.parse(content).getResult()
+                        .orElseThrow(() -> new RuntimeException("Failed to parse: " + file));
 
                 String packageName = cu.getPackageDeclaration()
                         .map(pd -> pd.getNameAsString())
@@ -93,7 +96,7 @@ public class CodeStructureIndex {
                     classIndex.put(fqn, classInfo);
                 });
 
-            } catch (IOException e) {
+            } catch (IOException | RuntimeException e) {
                 log.warn("Failed to parse: {}", file, e);
             }
         }

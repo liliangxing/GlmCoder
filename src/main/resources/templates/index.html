@@ -258,6 +258,8 @@
                     addMessage('system', '索引完成: ' + data.classes + ' 个类, ' + data.methods + ' 个方法');
                     document.getElementById('statsText').textContent = data.classes + ' classes | ' + data.methods + ' methods';
                     loadStructure();
+                } else {
+                    addMessage('system', '索引失败: ' + (data.message || '未知错误'));
                 }
             } catch (e) {
                 addMessage('system', '索引失败: ' + e.message);
