@@ -5,8 +5,10 @@ import com.example.glmcoder.attachment.AttachmentManager;
 import com.example.glmcoder.index.IndexService;
 import com.example.glmcoder.project.ProjectManager;
 import com.example.glmcoder.security.PatchApprovalService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +22,6 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 @RestController
 @RequestMapping("/api")
-@RequiredArgsConstructor
 public class AgentController {
 
     private final CodingAgent codingAgent;
@@ -28,6 +29,18 @@ public class AgentController {
     private final IndexService indexService;
     private final AttachmentManager attachmentManager;
     private final PatchApprovalService patchApprovalService;
+    private final ChatModel chatModel;
+
+    public AgentController(CodingAgent codingAgent, ProjectManager projectManager,
+                           IndexService indexService, AttachmentManager attachmentManager,
+                           PatchApprovalService patchApprovalService, ChatModel chatModel) {
+        this.codingAgent = codingAgent;
+        this.projectManager = projectManager;
+        this.indexService = indexService;
+        this.attachmentManager = attachmentManager;
+        this.patchApprovalService = patchApprovalService;
+        this.chatModel = chatModel;
+    }
 
     @PostMapping("/chat")
     public ResponseEntity<Map<String, String>> chat(
@@ -39,6 +52,20 @@ public class AgentController {
             return ResponseEntity.ok(Map.of("status", "ok", "response", response));
         } catch (Exception e) {
             log.error("Chat failed", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/ping")
+    public ResponseEntity<Map<String, String>> ping() {
+        try {
+            var response = chatModel.call(new Prompt("用一个简短的句子回答：什么是 Java",
+                    OpenAiChatOptions.builder().maxTokens(50).build()));
+            String content = response.getResult().getOutput().getText();
+            return ResponseEntity.ok(Map.of("status", "ok", "response", content));
+        } catch (Exception e) {
+            log.error("Ping failed", e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("status", "error", "message", e.getMessage()));
         }
