@@ -13,13 +13,13 @@
 
     <groupId>com.example</groupId>
     <artifactId>glmcoder</artifactId>
-    <version>0.1.0</version>
+    <version>1.0.0</version>
     <name>GlmCoder</name>
     <description>Java Coding Agent based on GLM-4.7-Flash + Spring AI</description>
 
     <properties>
         <java.version>17</java.version>
-        <spring-ai.version>1.0.0-M6</spring-ai.version>
+        <spring-ai.version>1.1.4</spring-ai.version>
     </properties>
 
     <dependencies>
@@ -48,10 +48,15 @@
             <artifactId>hibernate-community-dialects</artifactId>
         </dependency>
 
-        <!-- Spring AI -->
+        <!-- Spring AI 1.1.4 - modular (replaces old spring-ai-openai-spring-boot-starter) -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-openai-spring-boot-starter</artifactId>
+            <artifactId>spring-ai-openai</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-client-chat</artifactId>
             <version>${spring-ai.version}</version>
         </dependency>
 

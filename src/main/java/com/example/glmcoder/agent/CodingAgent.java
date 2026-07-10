@@ -5,6 +5,7 @@ import com.example.glmcoder.context.ContextCompressor;
 import com.example.glmcoder.index.IndexService;
 import com.example.glmcoder.project.ProjectManager;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -31,10 +32,10 @@ public class CodingAgent {
     }
 
     public String execute(String projectId, String userQuery) throws IOException {
-        return execute(projectId, userQuery, "");
+        return execute(projectId, userQuery, "", null);
     }
 
-    public String execute(String projectId, String userQuery, String context) throws IOException {
+    public String execute(String projectId, String userQuery, String context, String conversationId) throws IOException {
         Path projectPath = projectManager.getProjectPath(projectId);
 
         indexService.indexProject(projectPath);
@@ -60,8 +61,10 @@ public class CodingAgent {
             """.formatted(compressed.summary, contextSection, userQuery);
 
         try {
-            String response = chatClientFactory.createChatClient()
-                    .prompt()
+            ChatClient client = conversationId != null && !conversationId.isBlank()
+                    ? chatClientFactory.createChatClient(conversationId)
+                    : chatClientFactory.createChatClient();
+            String response = client.prompt()
                     .user(prompt)
                     .call()
                     .content();
@@ -93,7 +96,7 @@ public class CodingAgent {
                 .user(prompt)
                 .stream()
                 .content()
-                .doOnNext(content -> result.append(content))
+                .doOnNext(result::append)
                 .blockLast();
 
         return result.toString();

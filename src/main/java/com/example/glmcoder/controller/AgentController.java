@@ -2,15 +2,13 @@ package com.example.glmcoder.controller;
 
 import com.example.glmcoder.agent.CodingAgent;
 import com.example.glmcoder.attachment.AttachmentManager;
+import com.example.glmcoder.config.DynamicChatClientFactory;
 import com.example.glmcoder.index.IndexService;
 import com.example.glmcoder.model.ConversationMessage;
 import com.example.glmcoder.project.ProjectManager;
 import com.example.glmcoder.security.PatchApprovalService;
 import com.example.glmcoder.service.ConversationService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +16,6 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -33,19 +30,20 @@ public class AgentController {
     private final IndexService indexService;
     private final AttachmentManager attachmentManager;
     private final PatchApprovalService patchApprovalService;
-    private final ChatModel chatModel;
+    private final DynamicChatClientFactory chatClientFactory;
     private final ConversationService conversationService;
 
     public AgentController(CodingAgent codingAgent, ProjectManager projectManager,
                            IndexService indexService, AttachmentManager attachmentManager,
-                           PatchApprovalService patchApprovalService, ChatModel chatModel,
+                           PatchApprovalService patchApprovalService,
+                           DynamicChatClientFactory chatClientFactory,
                            ConversationService conversationService) {
         this.codingAgent = codingAgent;
         this.projectManager = projectManager;
         this.indexService = indexService;
         this.attachmentManager = attachmentManager;
         this.patchApprovalService = patchApprovalService;
-        this.chatModel = chatModel;
+        this.chatClientFactory = chatClientFactory;
         this.conversationService = conversationService;
     }
 
@@ -61,9 +59,7 @@ public class AgentController {
                 conversationId = conv.getId();
             }
 
-            List<ConversationMessage> history = conversationService.getMessages(conversationId);
-            String context = buildContext(history);
-            String response = codingAgent.execute(projectId, message, context);
+            String response = codingAgent.execute(projectId, message, "", conversationId);
 
             conversationService.saveMessage(conversationId, "agent", response);
 
@@ -79,26 +75,15 @@ public class AgentController {
         }
     }
 
-    private String buildContext(List<ConversationMessage> history) {
-        if (history.isEmpty()) return "";
-        StringBuilder sb = new StringBuilder();
-        int maxHistory = 20;
-        int start = Math.max(0, history.size() - maxHistory);
-        for (int i = start; i < history.size(); i++) {
-            var msg = history.get(i);
-            if (i == start) sb.append("## 对话历史\n");
-            sb.append(msg.getRole()).append(": ").append(msg.getContent()).append("\n\n");
-        }
-        return sb.toString();
-    }
-
     @GetMapping("/ping")
     public ResponseEntity<Map<String, String>> ping() {
         try {
-            var response = chatModel.call(new Prompt("用一个简短的句子回答：什么是 Java",
-                    OpenAiChatOptions.builder().maxTokens(50).build()));
-            String content = response.getResult().getOutput().getText();
-            return ResponseEntity.ok(Map.of("status", "ok", "response", content));
+            String response = chatClientFactory.createChatClient()
+                    .prompt()
+                    .user("用一个简短的句子回答：什么是 Java")
+                    .call()
+                    .content();
+            return ResponseEntity.ok(Map.of("status", "ok", "response", response));
         } catch (Exception e) {
             log.error("Ping failed", e);
             return ResponseEntity.internalServerError()
