@@ -1,7 +1,5 @@
 package com.example.glmcoder.config;
 
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
@@ -27,9 +25,4 @@ public class AgentConfig {
         ## 当前项目路径
         {project_path}
         """;
-
-    @Bean
-    public ChatClient chatClient(ChatClient.Builder builder) {
-        return builder.build();
-    }
 }

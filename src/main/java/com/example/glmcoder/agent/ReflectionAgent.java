@@ -1,8 +1,7 @@
 package com.example.glmcoder.agent;
 
-import lombok.RequiredArgsConstructor;
+import com.example.glmcoder.config.DynamicChatClientFactory;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -12,10 +11,13 @@ import java.util.List;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ReflectionAgent {
 
-    private final ChatClient chatClient;
+    private final DynamicChatClientFactory chatClientFactory;
+
+    public ReflectionAgent(DynamicChatClientFactory chatClientFactory) {
+        this.chatClientFactory = chatClientFactory;
+    }
 
     public static final int MAX_RETRIES = 3;
 
@@ -50,7 +52,7 @@ public class ReflectionAgent {
         }
 
         String compileError = getCompileError(projectPath);
-        String feedback = chatClient.prompt()
+        String feedback = chatClientFactory.createChatClient().prompt()
                 .user("""
                     代码修改后编译失败：
                     %s
