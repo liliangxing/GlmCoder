@@ -3,8 +3,10 @@ package com.example.glmcoder.controller;
 import com.example.glmcoder.agent.CodingAgent;
 import com.example.glmcoder.attachment.AttachmentManager;
 import com.example.glmcoder.index.IndexService;
+import com.example.glmcoder.model.ConversationMessage;
 import com.example.glmcoder.project.ProjectManager;
 import com.example.glmcoder.security.PatchApprovalService;
+import com.example.glmcoder.service.ConversationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -16,6 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -30,31 +34,62 @@ public class AgentController {
     private final AttachmentManager attachmentManager;
     private final PatchApprovalService patchApprovalService;
     private final ChatModel chatModel;
+    private final ConversationService conversationService;
 
     public AgentController(CodingAgent codingAgent, ProjectManager projectManager,
                            IndexService indexService, AttachmentManager attachmentManager,
-                           PatchApprovalService patchApprovalService, ChatModel chatModel) {
+                           PatchApprovalService patchApprovalService, ChatModel chatModel,
+                           ConversationService conversationService) {
         this.codingAgent = codingAgent;
         this.projectManager = projectManager;
         this.indexService = indexService;
         this.attachmentManager = attachmentManager;
         this.patchApprovalService = patchApprovalService;
         this.chatModel = chatModel;
+        this.conversationService = conversationService;
     }
 
     @PostMapping("/chat")
-    public ResponseEntity<Map<String, String>> chat(
+    public ResponseEntity<Map<String, Object>> chat(
             @RequestParam String projectId,
-            @RequestParam String message) {
+            @RequestParam String message,
+            @RequestParam(required = false) String conversationId) {
 
         try {
-            String response = codingAgent.execute(projectId, message);
-            return ResponseEntity.ok(Map.of("status", "ok", "response", response));
+            if (conversationId == null || conversationId.isBlank()) {
+                var conv = conversationService.createConversation(projectId, message);
+                conversationId = conv.getId();
+            }
+
+            List<ConversationMessage> history = conversationService.getMessages(conversationId);
+            String context = buildContext(history);
+            String response = codingAgent.execute(projectId, message, context);
+
+            conversationService.saveMessage(conversationId, "agent", response);
+
+            return ResponseEntity.ok(Map.of(
+                    "status", "ok",
+                    "response", response,
+                    "conversationId", conversationId
+            ));
         } catch (Exception e) {
             log.error("Chat failed", e);
             return ResponseEntity.internalServerError()
                     .body(Map.of("status", "error", "message", e.getMessage()));
         }
+    }
+
+    private String buildContext(List<ConversationMessage> history) {
+        if (history.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        int maxHistory = 20;
+        int start = Math.max(0, history.size() - maxHistory);
+        for (int i = start; i < history.size(); i++) {
+            var msg = history.get(i);
+            if (i == start) sb.append("## 对话历史\n");
+            sb.append(msg.getRole()).append(": ").append(msg.getContent()).append("\n\n");
+        }
+        return sb.toString();
     }
 
     @GetMapping("/ping")
