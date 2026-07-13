@@ -9,8 +9,12 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -48,29 +52,56 @@ public class CodingAgent {
                 ? "\n" + context + "\n"
                 : "";
 
+        String projectInfo = buildProjectInfo(projectPath);
+
         String prompt = """
-            ## 项目ID（使用工具时必须传入此 projectId）
+            ## 项目ID
+            调用所有工具时，projectId 参数必须使用: %s
+
+            ## 项目信息
             %s
+
+            ## 工具使用规范
+            1. 修改文件前先 readFile 确认当前内容
+            2. editFile 的 oldText 必须与原文完全一致（含缩进），且必须唯一匹配
+            3. 如果 editFile 返回"不唯一"错误，根据返回的行号信息扩大 oldText 范围重新尝试
+            4. 如果 editFile 返回"未找到"错误，用 readFile 重新读取文件后再试
+            5. 文件创建或修改后，调用 compileCheckJava 验证编译
+            6. 编译失败时，根据错误日志定位问题自动修复
+            7. 一次只修改与当前任务直接相关的代码，不要重构无关部分
+
             ## 项目代码结构
             %s
+
             %s
+
             ## 用户请求
             %s
 
-            请分析上述请求，使用工具搜索相关代码，制定修改方案并执行。
-            修改完成后，调用 compileCheckJava 验证编译是否通过。
-            如果编译失败，请根据错误日志自动修复。
-            """.formatted(projectId, compressed.summary, contextSection, userQuery);
+            请分析上述请求，使用工具完成任务。完成后调用 compileCheckJava 验证编译通过。
+            """.formatted(projectId, projectInfo, compressed.summary, contextSection, userQuery);
 
         try {
             ChatClient client = conversationId != null && !conversationId.isBlank()
                     ? chatClientFactory.createChatClient(conversationId)
                     : chatClientFactory.createChatClient();
-            String response = client.prompt()
-                    .user(prompt)
-                    .call()
-                    .content();
-            return response != null ? response : "Agent returned empty response";
+
+            List<ChatClient> clients = new ArrayList<>();
+            clients.add(client);
+
+            String response;
+            int maxIterations = 10;
+            for (int i = 0; i < maxIterations; i++) {
+                response = client.prompt()
+                        .user(prompt)
+                        .call()
+                        .content();
+                if (response != null && !response.isBlank()) {
+                    return response;
+                }
+                prompt = "请继续完成任务。如果已完成，回复完成摘要。";
+            }
+            return "Agent 达到最大迭代次数，任务可能未完成。";
         } catch (Exception e) {
             log.error("Agent execution failed", e);
             return "Agent 执行失败: " + e.getMessage();
@@ -102,5 +133,37 @@ public class CodingAgent {
                 .blockLast();
 
         return result.toString();
+    }
+
+    private String buildProjectInfo(Path projectPath) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("当前日期: ").append(LocalDate.now()).append("\n");
+        sb.append("项目根目录: ").append(projectPath).append("\n");
+
+        try {
+            Path claudeMd = projectPath.resolve("CLAUDE.md");
+            if (Files.exists(claudeMd)) {
+                String content = Files.readString(claudeMd, StandardCharsets.UTF_8);
+                sb.append("项目约定 (CLAUDE.md):\n```\n")
+                        .append(content.length() > 2000 ? content.substring(0, 2000) + "..." : content)
+                        .append("\n```\n");
+            }
+        } catch (IOException e) {
+            log.debug("Cannot read CLAUDE.md: {}", e.getMessage());
+        }
+
+        try {
+            Path memPath = projectPath.resolve("MEMORY.md");
+            if (Files.exists(memPath)) {
+                String content = Files.readString(memPath, StandardCharsets.UTF_8);
+                sb.append("会话记忆 (MEMORY.md):\n```\n")
+                        .append(content.length() > 1500 ? content.substring(0, 1500) + "..." : content)
+                        .append("\n```\n");
+            }
+        } catch (IOException e) {
+            log.debug("Cannot read MEMORY.md: {}", e.getMessage());
+        }
+
+        return sb.toString();
     }
 }
