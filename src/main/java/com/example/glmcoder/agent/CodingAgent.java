@@ -82,6 +82,13 @@ public class CodingAgent {
             """.formatted(projectId, projectInfo, compressed.summary, contextSection, userQuery);
 
         try {
+            if (conversationId != null && !conversationId.isBlank()) {
+                var l2Result = contextCompressor.checkAndCompressConversation(conversationId, projectPath);
+                if (l2Result.compressed) {
+                    log.info("L2 compression applied: {} rounds summarized", l2Result.roundsCompressed);
+                }
+            }
+
             ChatClient client = conversationId != null && !conversationId.isBlank()
                     ? chatClientFactory.createChatClient(conversationId)
                     : chatClientFactory.createChatClient();
