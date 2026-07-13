@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ModelConfigService {
 
-    private volatile String currentModel = "glm-4-flashx";
+    private volatile String currentModel = "glm-4-flash";
 
     private volatile String currentApiKey = "15085dae9c11401da6662b88c91d2f4c.AiOP4uJyhV8WaMzA";
 

@@ -62,6 +62,7 @@ public class DynamicChatClientFactory {
                 ZhiPuAiChatOptions.builder()
                         .model(config.getModel())
                         .temperature(0.1)
+                        .toolChoice("auto")
                         .build());
 
         return ChatClient.builder(chatModel)

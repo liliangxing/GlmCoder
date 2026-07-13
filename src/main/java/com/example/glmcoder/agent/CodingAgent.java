@@ -49,6 +49,8 @@ public class CodingAgent {
                 : "";
 
         String prompt = """
+            ## 项目ID（使用工具时必须传入此 projectId）
+            %s
             ## 项目代码结构
             %s
             %s
@@ -58,7 +60,7 @@ public class CodingAgent {
             请分析上述请求，使用工具搜索相关代码，制定修改方案并执行。
             修改完成后，调用 compileCheckJava 验证编译是否通过。
             如果编译失败，请根据错误日志自动修复。
-            """.formatted(compressed.summary, contextSection, userQuery);
+            """.formatted(projectId, compressed.summary, contextSection, userQuery);
 
         try {
             ChatClient client = conversationId != null && !conversationId.isBlank()
