@@ -5,9 +5,9 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.zhipuai.ZhiPuAiChatModel;
+import org.springframework.ai.zhipuai.ZhiPuAiChatOptions;
+import org.springframework.ai.zhipuai.api.ZhiPuAiApi;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -52,20 +52,17 @@ public class DynamicChatClientFactory {
     }
 
     private ChatClient.Builder buildChatClientBuilder() {
-        OpenAiApi api = OpenAiApi.builder()
+        ZhiPuAiApi api = ZhiPuAiApi.builder()
                 .baseUrl(config.getBaseUrl())
                 .apiKey(config.getApiKey())
-                .completionsPath(config.getCompletionsPath())
                 .restClientBuilder(RestClient.builder())
                 .build();
 
-        OpenAiChatModel chatModel = OpenAiChatModel.builder()
-                .openAiApi(api)
-                .defaultOptions(OpenAiChatOptions.builder()
+        ZhiPuAiChatModel chatModel = new ZhiPuAiChatModel(api,
+                ZhiPuAiChatOptions.builder()
                         .model(config.getModel())
                         .temperature(0.1)
-                        .build())
-                .build();
+                        .build());
 
         return ChatClient.builder(chatModel)
                 .defaultTools(
