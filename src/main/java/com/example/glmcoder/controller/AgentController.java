@@ -91,18 +91,26 @@ public class AgentController {
         }
     }
 
-    @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStream(
             @RequestParam String projectId,
-            @RequestParam String message) {
+            @RequestParam String message,
+            @RequestParam(required = false) String conversationId) {
 
         SseEmitter emitter = new SseEmitter(300000L);
+        final String convId;
 
+        if (conversationId != null && !conversationId.isBlank()) {
+            convId = conversationId;
+        } else {
+            var conv = conversationService.createConversation(projectId, message);
+            convId = conv.getId();
+        }
+
+        String finalConvId = convId;
         CompletableFuture.runAsync(() -> {
             try {
-                String response = codingAgent.executeStreaming(projectId, message);
-                emitter.send(SseEmitter.event().data(Map.of("status", "ok", "response", response)));
-                emitter.complete();
+                codingAgent.executeStreamingToEmitter(projectId, message, finalConvId, emitter);
             } catch (IOException e) {
                 try {
                     emitter.send(SseEmitter.event().data(Map.of("status", "error", "message", e.getMessage())));

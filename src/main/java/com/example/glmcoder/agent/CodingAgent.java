@@ -7,6 +7,7 @@ import com.example.glmcoder.project.ProjectManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -140,6 +141,60 @@ public class CodingAgent {
                 .blockLast();
 
         return result.toString();
+    }
+
+    public void executeStreamingToEmitter(String projectId, String userQuery,
+                                           String conversationId, SseEmitter emitter)
+            throws IOException {
+        Path projectPath = projectManager.getProjectPath(projectId);
+        indexService.indexProject(projectPath);
+
+        String codeSummary = indexService.getStructureIndex().getClassSummary();
+        var compressed = contextCompressor.compress(codeSummary, new ArrayList<>(),
+                "", contextCompressor.MAX_TOKENS);
+
+        String prompt = """
+            ## 项目ID
+            调用所有工具时，projectId 参数必须使用: %s
+
+            ## 项目代码结构
+            %s
+
+            ## 用户请求
+            %s
+
+            请直接回答用户的问题。如果是编码任务，请立即开始编码并使用工具完成。
+            """.formatted(projectId, compressed.summary, userQuery);
+
+        try {
+            var client = chatClientFactory.createChatClient(conversationId);
+            client.prompt().user(prompt).stream().content()
+                    .doOnNext(chunk -> {
+                        try {
+                            if (chunk != null) {
+                                emitter.send(SseEmitter.event().data(chunk));
+                            }
+                        } catch (IOException e) {
+                            log.warn("Failed to send SSE chunk: {}", e.getMessage());
+                        }
+                    })
+                    .doOnComplete(() -> {
+                        try {
+                            emitter.send(SseEmitter.event().data("data:[DONE]"));
+                            emitter.complete();
+                        } catch (IOException e) {
+                            emitter.completeWithError(e);
+                        }
+                    })
+                    .doOnError(error -> {
+                        log.error("Streaming error", error);
+                        emitter.completeWithError(error);
+                    })
+                    .blockLast();
+        } catch (Exception e) {
+            log.error("Streaming execution failed", e);
+            emitter.completeWithError(e);
+        }
     }
 
     private String buildProjectInfo(Path projectPath) {

@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GlmCoder - Java Coding Agent</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --bg: #0d1117;
@@ -16,9 +17,10 @@
             --success: #3fb950;
             --panel-bg: #161b22;
             --input-bg: #0d1117;
-            --code-bg: #1a1f2b;
+            --code-bg: #0d1117;
             --header-bg: #161b22;
             --hover-bg: #1c2333;
+            --inline-code: #30363d;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -32,34 +34,50 @@
         header {
             background: var(--header-bg);
             border-bottom: 1px solid var(--border);
-            padding: 10px 16px;
+            padding: 8px 16px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             flex-shrink: 0;
+            min-height: 42px;
         }
-        header h1 { font-size: 16px; font-weight: 600; color: var(--accent); }
+        header h1 { font-size: 15px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+        header .sep { color: #30363d; margin: 0 2px; }
         .project-bar {
             display: flex;
-            gap: 6px;
+            gap: 5px;
             align-items: center;
             margin-left: auto;
         }
+        .project-bar select {
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            outline: none;
+            min-width: 160px;
+        }
+        .project-bar select:focus { border-color: var(--accent); }
         .project-bar input {
             background: var(--input-bg);
             border: 1px solid var(--border);
             color: var(--fg);
-            padding: 5px 10px;
+            padding: 4px 8px;
             border-radius: 6px;
             font-size: 12px;
-            width: 220px;
+            width: 160px;
+            outline: none;
         }
+        .project-bar input:focus { border-color: var(--accent); }
         .project-bar input::placeholder { color: #484f58; }
         button {
             background: var(--accent);
             color: #fff;
             border: none;
-            padding: 5px 12px;
+            padding: 4px 10px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 12px;
@@ -67,31 +85,30 @@
             white-space: nowrap;
         }
         button:hover { background: var(--accent-hover); }
-        button.danger { background: var(--danger); }
-        button.danger:hover { background: #da3633; }
-        button.small { padding: 3px 7px; font-size: 11px; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         button.ghost { background: transparent; border: 1px solid var(--border); color: var(--fg); }
         button.ghost:hover { background: var(--hover-bg); }
-        select {
+        button.danger { background: var(--danger); }
+        button.small { padding: 2px 6px; font-size: 11px; }
+        select:not(.project-bar select) {
             background: var(--input-bg);
             border: 1px solid var(--border);
             color: var(--fg);
-            padding: 5px 8px;
+            padding: 4px 8px;
             border-radius: 6px;
             font-size: 12px;
             cursor: pointer;
             outline: none;
         }
-        select:focus { border-color: var(--accent); }
         .api-key-wrapper { display: flex; align-items: center; gap: 3px; }
         .api-key-wrapper input {
             background: var(--input-bg);
             border: 1px solid var(--border);
             color: var(--fg);
-            padding: 5px 8px;
+            padding: 4px 6px;
             border-radius: 6px;
             font-size: 12px;
-            width: 170px;
+            width: 140px;
             outline: none;
         }
         .api-key-wrapper input:focus { border-color: var(--accent); }
@@ -99,7 +116,7 @@
             background: transparent;
             color: #8b949e;
             border: 1px solid var(--border);
-            padding: 3px 7px;
+            padding: 2px 6px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 11px;
@@ -123,11 +140,11 @@
             border-bottom: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
         .conv-sidebar-header .row {
             display: flex;
-            gap: 6px;
+            gap: 5px;
             align-items: center;
         }
         .conv-sidebar-header input {
@@ -135,7 +152,7 @@
             background: var(--input-bg);
             border: 1px solid var(--border);
             color: var(--fg);
-            padding: 6px 10px;
+            padding: 5px 8px;
             border-radius: 6px;
             font-size: 12px;
             outline: none;
@@ -147,7 +164,7 @@
             overflow-y: auto;
         }
         .conv-item {
-            padding: 10px 12px;
+            padding: 9px 12px;
             border-bottom: 1px solid rgba(48,54,61,0.5);
             cursor: pointer;
             display: flex;
@@ -158,7 +175,7 @@
         .conv-item:hover { background: var(--hover-bg); }
         .conv-item.active { background: rgba(88,166,255,0.1); border-left: 3px solid var(--accent); }
         .conv-item .title {
-            font-size: 13px;
+            font-size: 12px;
             flex: 1;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -167,7 +184,7 @@
         .conv-item .time {
             font-size: 10px;
             color: #8b949e;
-            margin-left: 8px;
+            margin-left: 6px;
             flex-shrink: 0;
         }
         .conv-item .del-btn {
@@ -184,7 +201,7 @@
         .conv-item:hover .del-btn { opacity: 1; }
         .conv-item .del-btn:hover { color: var(--danger); }
         .code-sidebar {
-            width: 260px;
+            width: 240px;
             background: var(--panel-bg);
             border-right: 1px solid var(--border);
             display: flex;
@@ -195,7 +212,7 @@
             padding: 10px 12px;
             border-bottom: 1px solid var(--border);
             font-weight: 600;
-            font-size: 12px;
+            font-size: 11px;
             color: #8b949e;
             text-transform: uppercase;
         }
@@ -207,7 +224,14 @@
             font-size: 11px;
             white-space: pre-wrap;
             background: var(--code-bg);
+            line-height: 1.5;
         }
+        .code-panel .class-entry {
+            cursor: pointer;
+            color: var(--accent);
+            padding: 2px 0;
+        }
+        .code-panel .class-entry:hover { text-decoration: underline; }
         .chat-area {
             flex: 1;
             display: flex;
@@ -223,11 +247,11 @@
             gap: 12px;
         }
         .message {
-            max-width: 85%;
+            max-width: 88%;
             padding: 10px 14px;
             border-radius: 8px;
-            font-size: 14px;
-            line-height: 1.5;
+            font-size: 13px;
+            line-height: 1.6;
         }
         .message.user {
             align-self: flex-end;
@@ -238,25 +262,57 @@
             align-self: flex-start;
             background: var(--panel-bg);
             border: 1px solid var(--border);
-            white-space: pre-wrap;
-        }
-        .message.agent pre {
-            background: var(--code-bg);
-            padding: 8px;
-            border-radius: 4px;
-            overflow-x: auto;
-            margin: 6px 0;
-            font-size: 12px;
         }
         .message.system {
             align-self: center;
             background: transparent;
             color: #8b949e;
             font-size: 12px;
+            max-width: 100%;
+        }
+        .message.error {
+            align-self: center;
+            background: rgba(248,81,73,0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            font-size: 12px;
+        }
+        .message.agent pre {
+            background: var(--code-bg);
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 6px 0;
+            font-size: 12px;
+            line-height: 1.4;
+            border: 1px solid var(--border);
+        }
+        .message.agent code {
+            background: var(--inline-code);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .message.agent pre code {
+            background: transparent;
+            padding: 0;
+        }
+        .message.agent h1, .message.agent h2, .message.agent h3 {
+            margin: 8px 0 4px;
+            font-size: 14px;
+            color: var(--accent);
+        }
+        .message.agent ul, .message.agent ol { padding-left: 20px; margin: 4px 0; }
+        .message.agent p { margin: 4px 0; }
+        .message.agent blockquote {
+            border-left: 3px solid var(--border);
+            padding-left: 10px;
+            color: #8b949e;
+            margin: 6px 0;
         }
         .chat-input-area {
             border-top: 1px solid var(--border);
-            padding: 12px 16px;
+            padding: 10px 16px;
             display: flex;
             gap: 8px;
         }
@@ -265,22 +321,22 @@
             background: var(--input-bg);
             border: 1px solid var(--border);
             color: var(--fg);
-            padding: 10px;
+            padding: 8px;
             border-radius: 8px;
             resize: none;
             font-size: 14px;
             font-family: inherit;
-            min-height: 44px;
+            min-height: 40px;
             max-height: 120px;
         }
         .chat-input-area textarea::placeholder { color: #484f58; }
         .status-bar {
-            padding: 5px 16px;
+            padding: 4px 16px;
             border-top: 1px solid var(--border);
             font-size: 11px;
             color: #8b949e;
             display: flex;
-            gap: 16px;
+            gap: 14px;
             flex-shrink: 0;
         }
         .status-bar .dot {
@@ -299,25 +355,45 @@
             justify-content: center;
             flex: 1;
             color: #484f58;
-            gap: 8px;
+            gap: 6px;
             font-size: 13px;
         }
-        .loading-dot {
-            display: inline-block;
+        .typing-indicator {
+            display: inline-flex;
+            gap: 3px;
+            align-items: center;
+            padding: 8px 14px;
+        }
+        .typing-indicator span {
             width: 6px; height: 6px;
             border-radius: 50%;
             background: var(--accent);
             animation: pulse 1.2s infinite;
-            margin-left: 2px;
         }
-        .loading-dot:nth-child(2) { animation-delay: 0.2s; }
-        .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes pulse { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+        .streaming .agent:last-child {
+            border-left: 2px solid var(--accent);
+            transition: border-color 0.3s;
+        }
+        .copy-btn {
+            position: relative;
+        }
+        .msg-actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .message.agent:hover .msg-actions { opacity: 1; }
     </style>
 </head>
 <body>
     <header>
         <h1>GlmCoder</h1>
+        <span class="sep">|</span>
         <select id="modelSelect" onchange="onModelChange()">
             <option value="glm-4-flash">glm-4-flash</option>
             <option value="glm-4.7-flash">glm-4.7-flash</option>
@@ -327,44 +403,47 @@
             <button class="toggle-key" id="toggleKeyBtn" onclick="toggleApiKey()">显示</button>
         </div>
         <div class="project-bar">
-            <input type="text" id="projectPath" placeholder="项目路径" value="/workspace/GlmCoder">
-            <button id="openProjectBtn" onclick="openProject()">打开项目</button>
-            <button id="indexBtn" onclick="indexProject()" class="danger" style="display:none;">索引</button>
+            <select id="projectSelect" onchange="switchProject()">
+                <option value="">-- 打开项目 --</option>
+            </select>
+            <input type="text" id="projectPath" placeholder="新项目路径" value="/workspace/GlmCoder">
+            <button id="openProjectBtn" onclick="openProject()">打开</button>
+            <button id="indexBtn" onclick="indexProject()" class="ghost" style="display:none;">索引</button>
+            <button onclick="newConversation()" class="ghost small">+对话</button>
         </div>
     </header>
     <div class="container">
         <div class="conv-sidebar">
             <div class="conv-sidebar-header">
                 <div class="row">
-                    <input type="text" id="searchInput" placeholder="搜索对话..."
-                        oninput="searchConversations()">
+                    <input type="text" id="searchInput" placeholder="搜索对话..." oninput="searchConversations()">
                 </div>
-                <button onclick="newConversation()" class="ghost" style="width:100%;">+ 新建对话</button>
             </div>
             <div class="conv-list" id="convList">
                 <div class="empty-state">
                     <span>打开项目后</span>
-                    <span>自动显示对话列表</span>
+                    <span>显示对话列表</span>
                 </div>
             </div>
         </div>
         <div class="code-sidebar">
             <div class="code-sidebar-header">代码结构</div>
             <div class="code-panel" id="codePanel">
-                <span style="color:#8b949e;">打开项目后自动显示代码结构</span>
+                <span style="color:#8b949e;">打开项目后显示代码结构</span>
             </div>
         </div>
         <div class="chat-area">
             <div class="chat-messages" id="chatMessages">
                 <div class="empty-state">
                     <span>打开项目，选择或新建对话</span>
-                    <span>开始编码对话</span>
+                    <span>用 Enter 发送，Shift+Enter 换行</span>
                 </div>
             </div>
             <div class="chat-input-area">
-                <textarea id="chatInput" placeholder="输入编码任务（Enter 发送，Shift+Enter 换行）" rows="1"
-                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+                <textarea id="chatInput" placeholder="输入编码任务..." rows="1"
+                    onkeydown="handleKeydown(event)"></textarea>
                 <button id="sendBtn" onclick="sendMessage()" disabled>发送</button>
+                <button id="stopBtn" onclick="stopStreaming()" style="display:none;background:var(--danger);">停止</button>
             </div>
             <div class="status-bar">
                 <span><span class="dot disconnected" id="statusDot"></span> <span id="statusText">未连接</span></span>
@@ -374,71 +453,62 @@
     </div>
 
     <script>
-        let projectId = null;
-        let currentConvId = null;
-        let searchTimer = null;
+        marked.setOptions({ breaks: true, gfm: true });
+
+        const state = {
+            projects: {},
+            activeProjectId: null,
+            currentConvId: null,
+            searchTimer: null,
+            abortController: null,
+            streamingMsgEl: null,
+            streamingBuffer: ''
+        };
+
+        function $(id) { return document.getElementById(id); }
 
         async function loadConfig() {
             try {
                 const res = await fetch('/ui/config');
                 const data = await res.json();
-                document.getElementById('modelSelect').value = data.model;
-                if (data.apiKey) {
-                    document.getElementById('apiKeyInput').value = data.apiKey;
-                }
-            } catch (e) {
-                console.log('loadConfig failed');
-            }
+                $('modelSelect').value = data.model || 'glm-4-flash';
+                if (data.apiKey) $('apiKeyInput').value = data.apiKey;
+            } catch (e) {}
         }
 
         async function saveConfig() {
-            const model = document.getElementById('modelSelect').value;
-            const apiKey = document.getElementById('apiKeyInput').value;
             const params = new URLSearchParams();
-            params.append('model', model);
-            if (apiKey && apiKey !== '****') {
-                params.append('apiKey', apiKey);
-            }
+            params.append('model', $('modelSelect').value);
+            const key = $('apiKeyInput').value;
+            if (key && key !== '****') params.append('apiKey', key);
             try {
-                const res = await fetch('/ui/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: params.toString()
-                });
-                const data = await res.json();
-                if (data.status === 'ok') {
-                    document.getElementById('apiKeyInput').value = data.apiKey;
-                }
+                await fetch('/ui/config', { method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
             } catch (e) {}
         }
 
         function onModelChange() { saveConfig(); }
 
         function toggleApiKey() {
-            const input = document.getElementById('apiKeyInput');
-            const btn = document.getElementById('toggleKeyBtn');
-            if (input.type === 'password') {
-                input.type = 'text';
-                btn.textContent = '隐藏';
-            } else {
-                input.type = 'password';
-                btn.textContent = '显示';
-            }
+            const input = $('apiKeyInput');
+            const btn = $('toggleKeyBtn');
+            if (input.type === 'password') { input.type = 'text'; btn.textContent = '隐藏'; }
+            else { input.type = 'password'; btn.textContent = '显示'; }
         }
 
-        document.getElementById('apiKeyInput').addEventListener('change', function() { saveConfig(); });
+        $('apiKeyInput').addEventListener('change', saveConfig);
         loadConfig();
 
         function updateStatus(connected, text) {
-            const dot = document.getElementById('statusDot');
+            const dot = $('statusDot');
             dot.className = 'dot ' + (connected ? 'connected' : 'disconnected');
-            document.getElementById('statusText').textContent = text;
+            $('statusText').textContent = text;
         }
 
         async function openProject() {
-            const path = document.getElementById('projectPath').value.trim();
+            const path = $('projectPath').value.trim();
             if (!path) return;
-            addSysMsg('正在打开项目: ' + path + '...');
+            addSysMsg('正在打开: ' + path + '...');
             try {
                 const res = await fetch('/ui/project/open', {
                     method: 'POST',
@@ -447,81 +517,97 @@
                 });
                 const data = await res.json();
                 if (data.status === 'ok') {
-                    projectId = data.projectId;
-                    updateStatus(true, '项目已打开');
-                    document.getElementById('sendBtn').disabled = false;
-                    document.getElementById('indexBtn').style.display = 'inline-block';
+                    state.projects[data.projectId] = { id: data.projectId, path: path };
+                    state.activeProjectId = data.projectId;
+                    updateProjectSelect();
+                    updateStatus(true, '已连接 - ' + path.split('/').pop());
+                    $('sendBtn').disabled = false;
+                    $('indexBtn').style.display = 'inline-block';
+                    $('projectPath').value = '';
                     loadStructure();
                     loadConversations();
                 } else {
-                    addSysMsg('错误: ' + data.message);
+                    addErrorMsg('打开失败: ' + data.message);
                 }
             } catch (e) {
-                addSysMsg('连接失败: ' + e.message);
+                addErrorMsg('连接失败: ' + e.message);
             }
+        }
+
+        function updateProjectSelect() {
+            const sel = $('projectSelect');
+            sel.innerHTML = '<option value="">-- 选择项目 --</option>';
+            Object.values(state.projects).forEach(p => {
+                sel.innerHTML += '<option value="' + p.id + '"' +
+                    (p.id === state.activeProjectId ? ' selected' : '') + '>' +
+                    escapeHtml(p.path) + '</option>';
+            });
+        }
+
+        function switchProject() {
+            const id = $('projectSelect').value;
+            if (!id) return;
+            state.activeProjectId = id;
+            state.currentConvId = null;
+            $('chatMessages').innerHTML = '<div class="empty-state"><span>项目已切换</span><span>选择或新建对话</span></div>';
+            loadStructure();
+            loadConversations();
+            updateProjectSelect();
         }
 
         async function loadConversations(keyword) {
-            if (!projectId) return;
+            if (!state.activeProjectId) return;
             try {
-                let url = '/api/conversations?projectId=' + projectId;
+                let url = '/api/conversations?projectId=' + state.activeProjectId;
                 if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
                 const res = await fetch(url);
                 const data = await res.json();
-                if (data.status === 'ok') {
-                    renderConvList(data.conversations);
-                }
-            } catch (e) {
-                console.error('loadConversations failed', e);
-            }
+                if (data.status === 'ok') renderConvList(data.conversations);
+            } catch (e) { console.error(e); }
         }
 
         function searchConversations() {
-            clearTimeout(searchTimer);
-            searchTimer = setTimeout(() => {
-                const kw = document.getElementById('searchInput').value.trim();
-                loadConversations(kw);
-            }, 300);
+            clearTimeout(state.searchTimer);
+            state.searchTimer = setTimeout(() => loadConversations($('searchInput').value.trim()), 300);
         }
 
         function renderConvList(conversations) {
-            const el = document.getElementById('convList');
+            const el = $('convList');
             if (!conversations || conversations.length === 0) {
-                el.innerHTML = '<div class="empty-state"><span>暂无对话</span><span>发送消息自动保存</span></div>';
+                el.innerHTML = '<div class="empty-state"><span>暂无对话</span></div>';
                 return;
             }
             el.innerHTML = conversations.map(c => {
-                const active = c.id === currentConvId ? ' active' : '';
+                const active = c.id === state.currentConvId ? ' active' : '';
                 const time = formatTime(c.updatedAt || c.createdAt);
                 const title = escapeHtml(c.title || '新对话');
-                return `<div class="conv-item${active}" onclick="selectConversation('${c.id}')">
-                    <span class="title">${title}</span>
-                    <span class="time">${time}</span>
-                    <button class="del-btn" onclick="deleteConversation(event, '${c.id}')">&times;</button>
-                </div>`;
+                return '<div class="conv-item' + active + '" onclick="selectConversation(\'' + c.id + '\')">' +
+                    '<span class="title">' + title + '</span>' +
+                    '<span class="time">' + time + '</span>' +
+                    '<button class="del-btn" onclick="deleteConversation(event,\'' + c.id + '\')">&times;</button>' +
+                    '</div>';
             }).join('');
         }
 
         function formatTime(ts) {
             if (!ts) return '';
-            const d = new Date(ts);
-            const now = new Date();
-            const diffMs = now - d;
-            if (diffMs < 60000) return '刚刚';
-            if (diffMs < 3600000) return Math.floor(diffMs / 60000) + '分钟前';
-            if (diffMs < 86400000) return Math.floor(diffMs / 3600000) + '小时前';
-            return d.getMonth() + 1 + '/' + d.getDate();
+            const d = new Date(ts), now = new Date(), diff = now - d;
+            if (diff < 60000) return '刚刚';
+            if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+            return (d.getMonth() + 1) + '/' + d.getDate();
         }
 
         function escapeHtml(text) {
             if (!text) return '';
-            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         async function selectConversation(id) {
-            currentConvId = id;
-            document.getElementById('chatMessages').innerHTML = '';
+            state.currentConvId = id;
+            $('chatMessages').innerHTML = '';
             try {
                 const res = await fetch('/api/conversations/' + id + '/messages');
                 const data = await res.json();
@@ -529,128 +615,223 @@
                     data.messages.forEach(m => addMessage(m.role, m.content));
                 }
             } catch (e) {
-                addSysMsg('加载对话历史失败: ' + e.message);
+                addErrorMsg('加载历史失败: ' + e.message);
             }
-            loadConversations(document.getElementById('searchInput').value.trim() || null);
+            loadConversations($('searchInput').value.trim() || null);
         }
 
-        async function newConversation() {
-            if (!projectId) return;
-            currentConvId = null;
-            document.getElementById('chatMessages').innerHTML = '';
-            addSysMsg('新对话已创建，发送消息后自动保存');
+        function newConversation() {
+            state.currentConvId = null;
+            $('chatMessages').innerHTML = '<div class="empty-state"><span>新对话</span></div>';
         }
 
         async function deleteConversation(event, id) {
             event.stopPropagation();
-            if (!confirm('确定要删除这个对话吗？')) return;
+            if (!confirm('删除这个对话？')) return;
             try {
                 await fetch('/api/conversations/' + id, { method: 'DELETE' });
-                if (currentConvId === id) {
-                    currentConvId = null;
-                    document.getElementById('chatMessages').innerHTML = '';
-                    addSysMsg('对话已删除');
-                }
-                loadConversations(document.getElementById('searchInput').value.trim() || null);
-            } catch (e) {
-                addSysMsg('删除失败: ' + e.message);
-            }
+                if (state.currentConvId === id) { state.currentConvId = null; $('chatMessages').innerHTML = ''; }
+                loadConversations($('searchInput').value.trim() || null);
+            } catch (e) { addErrorMsg('删除失败: ' + e.message); }
         }
 
         async function loadStructure() {
-            if (!projectId) return;
+            if (!state.activeProjectId) return;
             try {
-                const res = await fetch('/api/structure?projectId=' + projectId);
+                const res = await fetch('/api/structure?projectId=' + state.activeProjectId);
                 const data = await res.json();
                 if (data.status === 'ok') {
-                    document.getElementById('codePanel').textContent = data.summary;
+                    let html = data.summary || '';
+                    html = html.replace(/类:(\S+)/g, '<div class="class-entry">类:$1</div>');
+                    $('codePanel').innerHTML = html || '<span style="color:#8b949e;">暂无结构信息</span>';
                 }
             } catch (e) {}
         }
 
         function addSysMsg(text) {
-            const el = document.getElementById('chatMessages');
             const div = document.createElement('div');
             div.className = 'message system';
             div.textContent = text;
-            el.appendChild(div);
-            el.scrollTop = el.scrollHeight;
+            $('chatMessages').appendChild(div);
+            scrollDown();
+        }
+
+        function addErrorMsg(text) {
+            const div = document.createElement('div');
+            div.className = 'message error';
+            div.textContent = text;
+            $('chatMessages').appendChild(div);
+            scrollDown();
         }
 
         function addMessage(role, text) {
-            const el = document.getElementById('chatMessages');
             const div = document.createElement('div');
             div.className = 'message ' + role;
-            div.textContent = text;
-            el.appendChild(div);
+            if (role === 'agent') {
+                div.innerHTML = renderMarkdown(text);
+            } else {
+                div.textContent = text;
+            }
+            $('chatMessages').appendChild(div);
+            scrollDown();
+        }
+
+        function renderMarkdown(text) {
+            if (!text) return '';
+            try {
+                let html = marked.parse(text);
+                html = html.replace(/<pre><code/g, '<pre><code class="language-java"');
+                return html;
+            } catch (e) {
+                return escapeHtml(text);
+            }
+        }
+
+        function scrollDown() {
+            const el = $('chatMessages');
             el.scrollTop = el.scrollHeight;
         }
 
-        async function indexProject() {
-            if (!projectId) return;
-            addSysMsg('正在索引项目代码...');
-            try {
-                const res = await fetch('/api/index?projectId=' + projectId, { method: 'POST' });
-                const data = await res.json();
-                if (data.status === 'ok') {
-                    addSysMsg('索引完成: ' + data.classes + ' 个类, ' + data.methods + ' 个方法');
-                    document.getElementById('statsText').textContent = data.classes + ' classes | ' + data.methods + ' methods';
-                    loadStructure();
-                } else {
-                    addSysMsg('索引失败: ' + (data.message || '未知错误'));
-                }
-            } catch (e) {
-                addSysMsg('索引失败: ' + e.message);
+        function handleKeydown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
             }
         }
 
+        async function indexProject() {
+            if (!state.activeProjectId) return;
+            addSysMsg('索引中...');
+            try {
+                const res = await fetch('/api/index?projectId=' + state.activeProjectId, { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    addSysMsg('索引完成: ' + data.classes + ' 类, ' + data.methods + ' 方法');
+                    $('statsText').textContent = data.classes + ' classes | ' + data.methods + ' methods';
+                    loadStructure();
+                } else {
+                    addErrorMsg('索引失败: ' + (data.message || '未知错误'));
+                }
+            } catch (e) { addErrorMsg('索引失败: ' + e.message); }
+        }
+
+        function setSendingState(sending) {
+            $('sendBtn').disabled = sending;
+            $('stopBtn').style.display = sending ? 'inline-block' : 'none';
+        }
+
         async function sendMessage() {
-            const input = document.getElementById('chatInput');
+            const input = $('chatInput');
             const message = input.value.trim();
-            if (!message || !projectId) return;
+            if (!message || !state.activeProjectId) return;
 
             input.value = '';
             input.style.height = 'auto';
-
             addMessage('user', message);
 
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'message system';
-            loadingDiv.innerHTML = '处理中<span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
-            document.getElementById('chatMessages').appendChild(loadingDiv);
-            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+            const loading = createTypingIndicator();
+            setSendingState(true);
 
             try {
                 const formData = new URLSearchParams();
-                formData.append('projectId', projectId);
+                formData.append('projectId', state.activeProjectId);
                 formData.append('message', message);
-                if (currentConvId) {
-                    formData.append('conversationId', currentConvId);
-                }
+                if (state.currentConvId) formData.append('conversationId', state.currentConvId);
 
-                const res = await fetch('/api/chat', {
+                state.abortController = new AbortController();
+
+                const res = await fetch('/api/chat/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData.toString()
+                    body: formData.toString(),
+                    signal: state.abortController.signal
                 });
-                const data = await res.json();
 
-                loadingDiv.remove();
+                loading.remove();
 
-                if (data.status === 'ok') {
-                    addMessage('agent', data.response);
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    addErrorMsg('请求失败: ' + (err.message || res.statusText));
+                    setSendingState(false);
+                    return;
+                }
 
-                    if (data.conversationId) {
-                        currentConvId = data.conversationId;
+                const msgEl = createAgentMessage();
+                state.streamingMsgEl = msgEl;
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                let fullResponse = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data:')) {
+                            const content = line.substring(5).trim();
+                            if (content === '[DONE]') {
+                                if (fullResponse) {
+                                    addMessage('agent', fullResponse);
+                                    if (state.currentConvId) {
+                                        loadConversations($('searchInput').value.trim() || null);
+                                    }
+                                }
+                                setSendingState(false);
+                                state.abortController = null;
+                                return;
+                            }
+                            fullResponse += content;
+                            msgEl.innerHTML = renderMarkdown(fullResponse);
+                            scrollDown();
+                        }
                     }
-                    loadConversations(document.getElementById('searchInput').value.trim() || null);
-                } else {
-                    addSysMsg('错误: ' + data.message);
+                }
+
+                if (fullResponse) {
+                    addMessage('agent', fullResponse);
                 }
             } catch (e) {
-                loadingDiv.remove();
-                addSysMsg('请求失败: ' + e.message);
+                if (e.name !== 'AbortError') {
+                    loading?.remove();
+                    addErrorMsg('连接失败: ' + e.message);
+                }
+            } finally {
+                state.streamingBuffer = '';
+                state.streamingMsgEl = null;
+                state.abortController = null;
+                setSendingState(false);
+                if (state.currentConvId) {
+                    loadConversations($('searchInput').value.trim() || null);
+                }
             }
+        }
+
+        function stopStreaming() {
+            if (state.abortController) {
+                state.abortController.abort();
+                addSysMsg('已停止');
+            }
+        }
+
+        function createTypingIndicator() {
+            const div = document.createElement('div');
+            div.className = 'message system';
+            div.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+            $('chatMessages').appendChild(div);
+            scrollDown();
+            return div;
+        }
+
+        function createAgentMessage() {
+            const div = document.createElement('div');
+            div.className = 'message agent';
+            $('chatMessages').appendChild(div);
+            return div;
         }
     </script>
 </body>
